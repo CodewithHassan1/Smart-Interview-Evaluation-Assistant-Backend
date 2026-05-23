@@ -4,9 +4,9 @@ import re
 
 import requests
 
-AI_API_URL = os.getenv("GEMINI_API_URL", "https://api.openai.com/v1/chat/completions")
+AI_API_URL = os.getenv("GEMINI_API_URL", "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions")
 AI_API_KEY = os.getenv("GEMINI_API_KEY")
-AI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-pro")
+AI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
 SYSTEM_PROMPT = (
     "You are a high-accuracy interview evaluation assistant. "
