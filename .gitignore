@@ -1,9 +1,6 @@
 __pycache__/
 *.py[cod]
-*.sqlite3
 *.log
-.env
-.env.example
+.env*
 .venv/
-venv/
 staticfiles/
