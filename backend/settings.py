@@ -153,6 +153,8 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # CSRF Trusted Origins (required for Vercel/HTTPS deployments)
 CSRF_TRUSTED_ORIGINS = [
     "https://*.vercel.app",
+    "https://smart-interview-evaluation-assistant.vercel.app",
+    "https://smart-interview-evaluation-assistant-backend-bgwknftnh.vercel.app",
 ]
 _csrf_trusted = [origin.strip() for origin in os.getenv("CSRF_TRUSTED_ORIGINS", "").split(",") if origin.strip()]
 if _csrf_trusted:
