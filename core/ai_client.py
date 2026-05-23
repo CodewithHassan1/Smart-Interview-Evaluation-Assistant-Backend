@@ -1,8 +1,11 @@
 import json
+import logging
 import os
 import re
 
 import requests
+
+logger = logging.getLogger(__name__)
 
 AI_API_URL = os.getenv("GEMINI_API_URL", "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions")
 AI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -40,16 +43,23 @@ PROMPT_TEMPLATE = (
 
 
 def extract_json(text):
-    candidate = re.search(r"\{.*\}", text, re.S)
+    """Extract JSON from AI response, handling markdown fences and thinking output."""
+    # Strip markdown code fences (```json ... ``` or ``` ... ```)
+    stripped = re.sub(r"```(?:json)?\s*", "", text)
+    stripped = re.sub(r"```", "", stripped).strip()
+
+    candidate = re.search(r"\{.*\}", stripped, re.S)
     if not candidate:
         return None
     try:
         return json.loads(candidate.group())
     except json.JSONDecodeError:
-        cleaned = text[candidate.start():candidate.end()]
+        # Try cleaning control characters
+        cleaned = re.sub(r"[\x00-\x1f]+", " ", candidate.group())
         try:
             return json.loads(cleaned)
         except json.JSONDecodeError:
+            logger.warning("Failed to parse JSON from AI response: %s", candidate.group()[:200])
             return None
 
 
@@ -166,7 +176,7 @@ def transform_notes_to_report(raw_notes: str, candidate_name: str, position: str
     payload = {
         "model": AI_MODEL,
         "temperature": 0.2,
-        "max_tokens": 900,
+        "max_tokens": 2048,
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
             {
@@ -185,7 +195,7 @@ def transform_notes_to_report(raw_notes: str, candidate_name: str, position: str
         "Content-Type": "application/json",
     }
 
-    response = requests.post(AI_API_URL, headers=headers, json=payload, timeout=30)
+    response = requests.post(AI_API_URL, headers=headers, json=payload, timeout=60)
     response.raise_for_status()
     data = response.json()
     text = ""
@@ -195,5 +205,6 @@ def transform_notes_to_report(raw_notes: str, candidate_name: str, position: str
     elif "output" in data and len(data["output"]) > 0:
         text = data["output"][0].get("content", [])[0].get("text", "")
 
+    logger.info("AI raw response (first 500 chars): %s", text[:500])
     parsed = extract_json(text) or {}
     return normalize_ai_payload(parsed, candidate_name)
