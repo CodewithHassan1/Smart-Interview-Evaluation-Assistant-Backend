@@ -54,14 +54,26 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "backend.wsgi.application"
 
+
+def _database_ssl_options():
+    sslmode = os.getenv("DB_SSLMODE", "").strip()
+    if sslmode:
+        return {"sslmode": sslmode}
+    host = os.getenv("DB_HOST", "")
+    if host.endswith(".neon.tech"):
+        return {"sslmode": "require"}
+    return {}
+
+
 DATABASES = {
     "default": {
         "ENGINE": os.getenv("DB_ENGINE", "django.db.backends.postgresql"),
-        "NAME": os.getenv("DB_NAME", "interview_evaluation"),
-        "USER": os.getenv("DB_USER", "postgres"),
-        "PASSWORD": os.getenv("DB_PASSWORD", "postgres"),
+        "NAME": os.getenv("DB_NAME", "neondb"),
+        "USER": os.getenv("DB_USER", ""),
+        "PASSWORD": os.getenv("DB_PASSWORD", ""),
         "HOST": os.getenv("DB_HOST", "localhost"),
         "PORT": os.getenv("DB_PORT", "5432"),
+        "OPTIONS": _database_ssl_options(),
     }
 }
 
