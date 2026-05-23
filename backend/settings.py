@@ -56,27 +56,54 @@ TEMPLATES = [
 WSGI_APPLICATION = "backend.wsgi.application"
 
 
+import urllib.parse
+
 def _database_ssl_options():
     sslmode = os.getenv("DB_SSLMODE", "").strip()
     if sslmode:
         return {"sslmode": sslmode}
     host = os.getenv("DB_HOST", "")
-    if host.endswith(".neon.tech"):
+    if host and host.endswith(".neon.tech"):
         return {"sslmode": "require"}
     return {}
 
-
-DATABASES = {
-    "default": {
-        "ENGINE": os.getenv("DB_ENGINE", "django.db.backends.postgresql"),
-        "NAME": os.getenv("DB_NAME", "neondb"),
-        "USER": os.getenv("DB_USER", ""),
-        "PASSWORD": os.getenv("DB_PASSWORD", ""),
-        "HOST": os.getenv("DB_HOST", "localhost"),
-        "PORT": os.getenv("DB_PORT", "5432"),
-        "OPTIONS": _database_ssl_options(),
+database_url = os.getenv("DATABASE_URL")
+if database_url:
+    urllib.parse.uses_netloc.append("postgres")
+    urllib.parse.uses_netloc.append("postgresql")
+    url = urllib.parse.urlparse(database_url)
+    
+    # Handle optional SSL options for Neon DB
+    ssl_opts = {}
+    sslmode = os.getenv("DB_SSLMODE", "").strip()
+    if sslmode:
+        ssl_opts["sslmode"] = sslmode
+    elif url.hostname and url.hostname.endswith(".neon.tech"):
+        ssl_opts["sslmode"] = "require"
+        
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": url.path[1:],
+            "USER": url.username or "",
+            "PASSWORD": url.password or "",
+            "HOST": url.hostname or "localhost",
+            "PORT": url.port or "5432",
+            "OPTIONS": ssl_opts,
+        }
     }
-}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": os.getenv("DB_ENGINE", "django.db.backends.postgresql"),
+            "NAME": os.getenv("DB_NAME", "neondb"),
+            "USER": os.getenv("DB_USER", ""),
+            "PASSWORD": os.getenv("DB_PASSWORD", ""),
+            "HOST": os.getenv("DB_HOST", "localhost"),
+            "PORT": os.getenv("DB_PORT", "5432"),
+            "OPTIONS": _database_ssl_options(),
+        }
+    }
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -122,3 +149,12 @@ else:
 STATICFILES_STORAGE = "whitenoise.storage.CompressedStaticFilesStorage"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# CSRF Trusted Origins (required for Vercel/HTTPS deployments)
+CSRF_TRUSTED_ORIGINS = [
+    "https://*.vercel.app",
+]
+_csrf_trusted = [origin.strip() for origin in os.getenv("CSRF_TRUSTED_ORIGINS", "").split(",") if origin.strip()]
+if _csrf_trusted:
+    CSRF_TRUSTED_ORIGINS.extend(_csrf_trusted)
+
