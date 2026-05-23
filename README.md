@@ -53,6 +53,14 @@ Base URL: `http://127.0.0.1:8000/api`
 - `GET/PATCH/DELETE /evaluations/{id}/` — read / update verdict / delete
 - `GET /evaluations/current-user/` — current user profile
 
+## Deploy (Render + Neon)
+
+1. Connect this repo on [Render](https://render.com) as a **Web Service** (or use the included `render.yaml`).
+2. Set environment variables from the **Environment** section above (use Neon **pooler** host for serverless).
+3. Set `DJANGO_ALLOWED_HOSTS` to your Render hostname (e.g. `smart-interview-evaluation-api.onrender.com`).
+4. Set `CORS_ALLOWED_ORIGINS` to your Vercel frontend URL (e.g. `https://your-app.vercel.app`).
+5. After deploy, run `python seed_data.py` once via Render shell if you need sample data.
+
 ## Related repo
 
 Frontend: [Smart-Interview-Evaluation-Assistant-Frontend](https://github.com/CodewithHassan1/Smart-Interview-Evaluation-Assistant-Frontend)
