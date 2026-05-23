@@ -40,4 +40,4 @@ Base URL: `http://127.0.0.1:8000/api`
 
 ## Related repo
 
-Frontend: [Smart-Interview-Evaluation-Assistant-Frontend](https://github.com/HassanHaider55/Smart-Interview-Evaluation-Assistant-Frontend)
+Frontend: [Smart-Interview-Evaluation-Assistant-Frontend](https://github.com/CodewithHassan1/Smart-Interview-Evaluation-Assistant-Frontend)
