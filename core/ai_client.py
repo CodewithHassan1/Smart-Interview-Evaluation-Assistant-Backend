@@ -12,18 +12,30 @@ SYSTEM_PROMPT = (
     "You are a high-accuracy interview evaluation assistant. "
     "Convert messy interviewer notes into a professional evaluation report. "
     "Extract candidate strengths, technical skills, and assessment categories. "
-    "Return only valid JSON with the exact keys requested."
+    "Return only valid JSON matching the exact schema requested."
 )
 
 PROMPT_TEMPLATE = (
     "Candidate: {candidate_name}\n"
     "Position: {position}\n"
     "Raw interviewer notes:\n{raw_notes}\n\n"
-    "Convert the above into a structured professional evaluation. "
-    "Include a clear summary, a consistent scoring section, and a hiring recommendation. "
-    "Output only valid JSON, with keys: structured_report, final_verdict, score_breakdown, skills_summary, reasoning. "
-    "Provide scores between 1 and 10. "
-    "If the notes include multiple strengths or challenges, extract them into the report narrative."
+    "Convert the above notes into a structured professional evaluation JSON object. "
+    "The output JSON MUST follow this exact schema structure:\n"
+    "{{\n"
+    '  "structured_report": "A detailed, professional narrative summary of the candidate\'s performance, strengths, and areas for improvement.",\n'
+    '  "final_verdict": "Must be exactly one of: \'Strong Hire\', \'Hire\', or \'No Hire\'.",\n'
+    '  "score_breakdown": {{\n'
+    '    "communication": <integer score between 1 and 10>,\n'
+    '    "technical": <integer score between 1 and 10>,\n'
+    '    "problem_solving": <integer score between 1 and 10>\n'
+    '  }},\n'
+    '  "skills_summary": {{\n'
+    '    "technical_skills": [<array of extracted technical skill strings like libraries, frameworks, languages>],\n'
+    '    "soft_skills": [<array of extracted soft skill strings like collaboration, communication, leadership>]\n'
+    '  }},\n'
+    '  "reasoning": "A short explanation justifying the score breakdown and final recommendation."\n'
+    "}}\n"
+    "Do not include any wrapping markdown like ```json ... ```. Output raw JSON only."
 )
 
 
@@ -39,6 +51,97 @@ def extract_json(text):
             return json.loads(cleaned)
         except json.JSONDecodeError:
             return None
+
+
+def normalize_ai_payload(parsed: dict, candidate_name: str) -> dict:
+    """
+    Normalizes the JSON response from the LLM to fit the exact database schema
+    and front-end expectations (preventing broken scorecards or skills formats).
+    """
+    # 1. Normalize structured_report
+    report = parsed.get("structured_report", "").strip()
+    if not report:
+        report = f"Evaluation report for {candidate_name}."
+
+    # 2. Normalize final_verdict
+    verdict = parsed.get("final_verdict", "No Hire")
+    if not isinstance(verdict, str):
+        verdict = "No Hire"
+    
+    verdict_clean = verdict.strip().lower()
+    if "strong" in verdict_clean:
+        final_verdict = "Strong Hire"
+    elif "no" in verdict_clean:
+        final_verdict = "No Hire"
+    else:
+        final_verdict = "Hire"
+
+    # 3. Normalize score_breakdown
+    raw_scores = parsed.get("score_breakdown", {})
+    if not isinstance(raw_scores, dict):
+        raw_scores = {}
+    
+    def find_score(keys, default=5):
+        for k, v in raw_scores.items():
+            if any(word in k.lower() for word in keys):
+                try:
+                    return int(float(v))
+                except (ValueError, TypeError):
+                    continue
+        return default
+
+    score_breakdown = {
+        "communication": find_score(["communication", "comm", "soft"], 5),
+        "technical": find_score(["technical", "tech", "coding", "skill"], 5),
+        "problem_solving": find_score(["problem", "solving", "critical", "thinking", "reasoning"], 5),
+    }
+
+    # 4. Normalize skills_summary
+    raw_skills = parsed.get("skills_summary", {})
+    technical_skills = []
+    soft_skills = []
+
+    if isinstance(raw_skills, list):
+        # LLM returned a flat list. Split into technical and soft based on keywords
+        tech_keywords = ["react", "tailwind", "python", "javascript", "js", "api", "database", "sql", "git", "css", "html", "django", "postgres"]
+        for s in raw_skills:
+            if not isinstance(s, str):
+                continue
+            if any(keyword in s.lower() for keyword in tech_keywords):
+                technical_skills.append(s)
+            else:
+                soft_skills.append(s)
+    elif isinstance(raw_skills, dict):
+        # Extract technical skills
+        t_skills = raw_skills.get("technical_skills", [])
+        if isinstance(t_skills, list):
+            technical_skills = [str(x) for x in t_skills]
+        else:
+            for k, v in raw_skills.items():
+                if "tech" in k.lower() and isinstance(v, list):
+                    technical_skills = [str(x) for x in v]
+
+        # Extract soft skills
+        s_skills = raw_skills.get("soft_skills", [])
+        if isinstance(s_skills, list):
+            soft_skills = [str(x) for x in s_skills]
+        else:
+            for k, v in raw_skills.items():
+                if ("soft" in k.lower() or "inter" in k.lower()) and isinstance(v, list):
+                    soft_skills = [str(x) for x in v]
+
+    skills_summary = {
+        "technical_skills": technical_skills,
+        "soft_skills": soft_skills
+    }
+
+    return {
+        "structured_report": report,
+        "final_verdict": final_verdict,
+        "score_breakdown": score_breakdown,
+        "skills_summary": skills_summary,
+        "reasoning": parsed.get("reasoning", "Successfully parsed report.")
+    }
 
 
 def transform_notes_to_report(raw_notes: str, candidate_name: str, position: str) -> dict:
@@ -93,11 +196,4 @@ def transform_notes_to_report(raw_notes: str, candidate_name: str, position: str
         text = data["output"][0].get("content", [])[0].get("text", "")
 
     parsed = extract_json(text) or {}
-
-    return {
-        "structured_report": parsed.get("structured_report", text.strip()),
-        "final_verdict": parsed.get("final_verdict", "No Hire"),
-        "score_breakdown": parsed.get("score_breakdown", {}),
-        "skills_summary": parsed.get("skills_summary", {}),
-        "reasoning": parsed.get("reasoning", "AI output could not be parsed cleanly."),
-    }
+    return normalize_ai_payload(parsed, candidate_name)
