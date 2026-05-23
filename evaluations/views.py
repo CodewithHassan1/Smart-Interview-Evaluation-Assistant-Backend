@@ -47,6 +47,10 @@ class CandidateEvaluationViewSet(viewsets.ModelViewSet):
     queryset = CandidateEvaluation.objects.select_related("created_by").all()
     permission_classes = [permissions.IsAuthenticated]
 
+    def get_queryset(self):
+        """Return only evaluations created by the currently authenticated user."""
+        return self.queryset.filter(created_by=self.request.user)
+
     def perform_create(self, serializer):
         raw_notes = serializer.validated_data.get("raw_notes")
         candidate_name = serializer.validated_data.get("candidate_name")
