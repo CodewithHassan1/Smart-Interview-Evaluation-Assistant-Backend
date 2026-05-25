@@ -8,7 +8,13 @@ load_dotenv(BASE_DIR / ".env")
 
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "django-insecure-change-this-secret")
 DEBUG = os.getenv("DJANGO_DEBUG", "True") == "True"
-ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "*").split(",")
+ALLOWED_HOSTS = [host.strip() for host in os.getenv("DJANGO_ALLOWED_HOSTS", "*").split(",") if host.strip()]
+if ".vercel.app" not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(".vercel.app")
+if "127.0.0.1" not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append("127.0.0.1")
+if "localhost" not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append("localhost")
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -154,6 +160,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 CSRF_TRUSTED_ORIGINS = [
     "https://*.vercel.app",
     "https://smart-interview-evaluation-assistant.vercel.app",
+    "https://smart-interview-evaluation-assistan.vercel.app",
     "https://smart-interview-evaluation-assistant-backend-bgwknftnh.vercel.app",
 ]
 _csrf_trusted = [origin.strip() for origin in os.getenv("CSRF_TRUSTED_ORIGINS", "").split(",") if origin.strip()]
