@@ -3,7 +3,14 @@ import os
 import sys
 from pathlib import Path
 
-from dotenv import load_dotenv
+try:
+    from dotenv import load_dotenv
+except Exception:
+    # If python-dotenv is not available in the build environment,
+    # provide a no-op `load_dotenv` so builds that run management
+    # commands before dependencies are installed don't crash.
+    def load_dotenv(path=None):
+        return None
 
 def main():
     load_dotenv(Path(__file__).resolve().parent / ".env")
